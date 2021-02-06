@@ -14,12 +14,13 @@ ENV sa_password="_" \
 
 SHELL ["powershell", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
 
-# make install files accessible
+# Make install files accessible
 COPY start.ps1 /
 WORKDIR /
 
-RUN Invoke-WebRequest -Uri $env:BOX -OutFile SQL.box ; \
-  Invoke-WebRequest -Uri $env:EXE -OutFile SQL.exe ; \
+# Download and install SQL Server developer
+RUN Invoke-WebRequest -Uri $env:box -OutFile SQL.box ; \
+  Invoke-WebRequest -Uri $env:exe -OutFile SQL.exe ; \
   Start-Process -Wait -FilePath .\SQL.exe -ArgumentList /qs, /x:setup ; \
   .\setup\setup.exe /q /ACTION=Install /INSTANCENAME=MSSQLSERVER /FEATURES=SQLEngine /UPDATEENABLED=0 /SQLSVCACCOUNT='NT AUTHORITY\NETWORK SERVICE' /SQLSYSADMINACCOUNTS='BUILTIN\ADMINISTRATORS' /TCPENABLED=1 /NPENABLED=0 /IACCEPTSQLSERVERLICENSETERMS /SQLBACKUPDIR='C:\SqlServer\MSSQL\Backup' /SQLUSERDBDIR='C:\SqlServer\MSSQL\DATA' /SQLUSERDBLOGDIR='C:\SqlServer\MSSQL\LOG'; \
   Remove-Item -Recurse -Force SQL.exe, SQL.box, setup
@@ -29,11 +30,12 @@ RUN Stop-Service MSSQLSERVER ; \
   Set-ItemProperty -path 'HKLM:\software\microsoft\microsoft sql server\mssql15.MSSQLSERVER\mssqlserver\supersocketnetlib\tcp\ipall' -Name tcpport -Value 1433 ; \
   Set-ItemProperty -path 'HKLM:\software\microsoft\microsoft sql server\mssql15.MSSQLSERVER\mssqlserver\' -name LoginMode -value 2 ;
 
-# install cumulative update
-RUN Invoke-WebRequest -Uri $env:CU_EXE -OutFile CU.exe ; \
+# Download and install cumulative update
+RUN Invoke-WebRequest -Uri $env:cu_exe -OutFile CU.exe ; \
   Start-Process -Wait -FilePath .\CU.exe -ArgumentList /quiet, /IAcceptSQLServerLicenseTerms, /Action=Patch, /AllInstances ; \
   Remove-Item -Recurse -Force CU.exe
 
 HEALTHCHECK CMD [ "sqlcmd", "-Q", "select 1" ]
 
-CMD .\start -sa_password $env:sa_password -ACCEPT_EULA $env:ACCEPT_EULA -attach_dbs \"$env:attach_dbs\" -Verbose
+# Start SQL Server, set sa password and optionaly attached databases
+CMD .\start.ps1 -sa_password $env:sa_password -ACCEPT_EULA $env:ACCEPT_EULA -attach_dbs \"$env:attach_dbs\" -Verbose
